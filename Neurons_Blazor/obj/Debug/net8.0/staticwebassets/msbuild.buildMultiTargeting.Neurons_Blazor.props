@@ -1,0 +1,3 @@
+﻿<Project>
+  <Import Project="..\build\Neurons_Blazor.props" />
+</Project>

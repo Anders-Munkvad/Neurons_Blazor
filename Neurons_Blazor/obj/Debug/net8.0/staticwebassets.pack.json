@@ -1,0 +1,41 @@
+{
+  "Files": [
+    {
+      "Id": "C:\\Users\\ander\\OneDrive - University of Copenhagen\\Desktop\\Neurons_Blazor\\Neurons_Blazor\\obj\\Debug\\net8.0\\scopedcss\\projectbundle\\Neurons_Blazor.bundle.scp.css",
+      "PackagePath": "staticwebassets\\Neurons_Blazor.bundle.scp.css"
+    },
+    {
+      "Id": "C:\\Users\\ander\\OneDrive - University of Copenhagen\\Desktop\\Neurons_Blazor\\Neurons_Blazor\\wwwroot\\app.css",
+      "PackagePath": "staticwebassets\\app.css"
+    },
+    {
+      "Id": "C:\\Users\\ander\\OneDrive - University of Copenhagen\\Desktop\\Neurons_Blazor\\Neurons_Blazor\\wwwroot\\bootstrap\\bootstrap.min.css",
+      "PackagePath": "staticwebassets\\bootstrap\\bootstrap.min.css"
+    },
+    {
+      "Id": "C:\\Users\\ander\\OneDrive - University of Copenhagen\\Desktop\\Neurons_Blazor\\Neurons_Blazor\\wwwroot\\bootstrap\\bootstrap.min.css.map",
+      "PackagePath": "staticwebassets\\bootstrap\\bootstrap.min.css.map"
+    },
+    {
+      "Id": "C:\\Users\\ander\\OneDrive - University of Copenhagen\\Desktop\\Neurons_Blazor\\Neurons_Blazor\\wwwroot\\favicon.png",
+      "PackagePath": "staticwebassets\\favicon.png"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.Neurons_Blazor.Microsoft.AspNetCore.StaticWebAssets.props",
+      "PackagePath": "build\\Microsoft.AspNetCore.StaticWebAssets.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.build.Neurons_Blazor.props",
+      "PackagePath": "build\\Neurons_Blazor.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.buildMultiTargeting.Neurons_Blazor.props",
+      "PackagePath": "buildMultiTargeting\\Neurons_Blazor.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.buildTransitive.Neurons_Blazor.props",
+      "PackagePath": "buildTransitive\\Neurons_Blazor.props"
+    }
+  ],
+  "ElementsToRemove": []
+}
