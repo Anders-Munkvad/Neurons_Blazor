@@ -14,8 +14,8 @@
 </div>
 
 <div class="upload-box">
-    <h3>Upload a brand compliance information</h3>
-    <InputFile OnChange="HandleBrandCompliance" accept="application/pdf" />
+    <h3>Upload a brand compliance PDF</h3>
+    <InputFile OnChange="HandleBrandKitSelected" accept="application/pdf" />
 </div>
 
 @if (imagePreview != null)
@@ -25,194 +25,100 @@
     </div>
 }
 
-@if (isLoading)
-{
-    <p>Checking brand compliance…</p>
-}
+<div class="mt-3">
+    <button class="btn btn-primary" @onclick="CallImageEvaluation" disabled="@(!CanEvaluate || isLoading)">
+        @(isLoading ? "Evaluating..." : "Evaluate Brand Compliance")
+    </button>
+</div>
 
 @if (!string.IsNullOrEmpty(error))
 {
-    <p class="text-danger">@error</p>
+    <p class="text-danger mt-3">@error</p>
 }
 
-@if (brandResponse != null)
+@if (evalResponse is not null)
 {
-    <div class="mt-3">
-        <h4>@brandResponse.Message</h4>
+    <div class="mt-4">
+        <h4>Prompt Used</h4>
+        <pre>@evalResponse.PromptUsed</pre>
 
-        @if (brandResponse.Requirements.FontStyles is not null)
-        {
-            <h5>Font styles</h5>
-            <ul>
-            @foreach (var kv in brandResponse.Requirements.FontStyles)
-            {
-                <li><b>@kv.Key:</b> @kv.Value</li>
-            }
-            </ul>
-        }
-
-        @if (brandResponse.Requirements.LogoSafezone is not null)
-        {
-            <h5>Logo safe zone</h5>
-            <p><b>Value:</b> @brandResponse.Requirements.LogoSafezone.Value</p>
-            <p>@brandResponse.Requirements.LogoSafezone.Requirements</p>
-        }
-
-        @if (brandResponse.Requirements.LogoColour?.LogoColours is not null)
-        {
-            <h5>Logo colours</h5>
-            <ul>
-            @foreach (var c in brandResponse.Requirements.LogoColour.LogoColours)
-            { <li>@c</li> }
-            </ul>
-        }
-
-        @if (brandResponse.Requirements.LogoColourPalette?.Colours is not null)
-        {
-            <h5>Colour palette</h5>
-            <ul>
-            @foreach (var c in brandResponse.Requirements.LogoColourPalette.Colours)
-            { <li>@c</li> }
-            </ul>
-        }
+        <h4>Model Output</h4>
+        <pre>@evalResponse.ModelOutput</pre>
     </div>
 }
 
 
 @code {
-
-    private BrandComplianceResponse? brandResponse;
-    //private ImageEvaluationResponse evalResponse;
-
-    private ImageEvaluationResponse evalResponse;
-
-    private IBrowserFile? selectedFile;
+    private IBrowserFile? uploadedImage;
+    private IBrowserFile? uploadedBrandKit;
     private string? imagePreview;
-    private bool isLoading;           // <-- was missing
-    private string? error;            // <-- was missing
+    private bool isLoading;
+    private string? error;
+
+    private ImageEvaluationResponse? evalResponse;
 
     [Inject]
-    private HttpClient Http { get; set; } = default!; // Injected via DI
+    private HttpClient Http { get; set; } = default!;
+
+    private bool CanEvaluate => uploadedImage is not null && uploadedBrandKit is not null;
 
     private async Task HandleImageSelected(InputFileChangeEventArgs e)
     {
-        selectedFile = e.File;
-
-        if (selectedFile != null)
+        uploadedImage = e.File;
+        if (uploadedImage != null)
         {
-            // Optional: resize to avoid large preview memory usage
-            var resizedImage = await selectedFile.RequestImageFileAsync("image/png", 600, 500);
-
-            using var stream = resizedImage.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024); // 10MB max
+            var resizedImage = await uploadedImage.RequestImageFileAsync("image/png", 600, 500);
+            using var stream = resizedImage.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
             using var ms = new MemoryStream();
             await stream.CopyToAsync(ms);
             var imageBytes = ms.ToArray();
             imagePreview = $"data:image/png;base64,{Convert.ToBase64String(imageBytes)}";
         }
     }
-    
-    private async Task HandleBrandCompliance(InputFileChangeEventArgs e)
+
+    private Task HandleBrandKitSelected(InputFileChangeEventArgs e)
     {
-        error = null;
-        brandResponse = null;
-        isLoading = true;
-
-        try
-        {
-            var file = e.File;
-            using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
-            using var content = new MultipartFormDataContent();
-            var fileContent = new StreamContent(stream);
-            fileContent.Headers.ContentType =
-                new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
-
-            // field name must match what your API expects (e.g., "file")
-            content.Add(fileContent, "file", file.Name);
-
-            var response = await Http.PostAsync("http://127.0.0.1:8000/extract_brand_compliance", content);
-            var body = await response.Content.ReadAsStringAsync();
-            Console.WriteLine($"Status: {(int)response.StatusCode} {response.ReasonPhrase}");
-            Console.WriteLine($"Body: {body}");
-
-            if (response.IsSuccessStatusCode)
-            {
-                brandResponse = JsonSerializer.Deserialize<BrandComplianceResponse>(
-                    body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-                if (brandResponse == null)
-                    error = "Could not parse API response.";
-            }
-            else
-            {
-                error = $"Upload failed: {(int)response.StatusCode} {response.ReasonPhrase}\n{body}";
-            }
-        }
-        catch (Exception ex)
-        {
-            error = ex.Message;
-        }
-        finally
-        {
-            isLoading = false;
-            StateHasChanged();
-        }
+        uploadedBrandKit = e.File;
+        return Task.CompletedTask;
     }
-    // Evaluates the picture, IFF both image and brand compliance has been uploaded
-    // Maybe just create a button that calls this function
-    // It needs two arguements according to API: brand_kit, image_file
 
-    private async Task HandleImageEvaluation(InputFileChangeEventArgs BrandKit, InputFileChangeEventArgs ImageFile)
+    private async Task CallImageEvaluation()
     {
+        if (!CanEvaluate) return;
+
         error = null;
+        evalResponse = null;
         isLoading = true;
-        
+
         try
         {
-            // -------------------------- IMAGE PREVIEW (optional) --------------------------
-            selectedFile = ImageFile.File;
-            if (selectedFile == null)
+            // Prepare image bytes
+            var resizedImage = await uploadedImage!.RequestImageFileAsync("image/png", 600, 500);
+            byte[] imageBytes;
+            using (var s = resizedImage.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024))
+            using (var ms = new MemoryStream())
             {
-                error = "Please select an image file.";
-                return;
+                await s.CopyToAsync(ms);
+                imageBytes = ms.ToArray();
             }
 
-            // Make a smaller preview
-            var resizedImage = await selectedFile.RequestImageFileAsync("image/png", 600, 500);
-            using var previewStream = resizedImage.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
-            using var previewMs = new MemoryStream();
-            await previewStream.CopyToAsync(previewMs);
-            var imageBytes = previewMs.ToArray();
-            imagePreview = $"data:image/png;base64,{Convert.ToBase64String(imageBytes)}";
-            // ------------------------------------------------------------------------------
+            // Prepare PDF stream
+            using var pdfStream = uploadedBrandKit!.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
 
-            // -------------------------- BUILD MULTIPART --------------------------
-            var brandKitFile = BrandKit.File;
-            if (brandKitFile == null)
-            {
-                error = "Please select a brand kit PDF.";
-                return;
-            }
-
-            using var pdfStream = brandKitFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
-            using var pdfContent = new StreamContent(pdfStream);
-            pdfContent.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
-
-            // Use the resized PNG we already have in memory
-            using var imgContent = new ByteArrayContent(imageBytes);
-            imgContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
-
+            // Build multipart content
             using var form = new MultipartFormDataContent();
-            // IMPORTANT: names must match FastAPI params exactly:
-            // async def evaluate_brand_compliance(brand_kit: UploadFile = File(...), image_file: UploadFile = File(...))
-            form.Add(pdfContent, "brand_kit", brandKitFile.Name);
-            form.Add(imgContent, "image_file", "image.png");
-            // --------------------------------------------------------------------
 
-            // -------------------------- CALL API --------------------------
+            var pdfContent = new StreamContent(pdfStream);
+            pdfContent.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+            form.Add(pdfContent, "brand_kit", uploadedBrandKit.Name);
+
+            var imgContent = new ByteArrayContent(imageBytes);
+            imgContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+            form.Add(imgContent, "image_file", uploadedImage.Name);
+
+            // Call FastAPI endpoint
             var response = await Http.PostAsync("http://127.0.0.1:8000/evaluate_brand_compliance_wAPI", form);
             var body = await response.Content.ReadAsStringAsync();
-            Console.WriteLine($"Status: {(int)response.StatusCode} {response.ReasonPhrase}");
-            Console.WriteLine($"Body: {body}");
 
             if (!response.IsSuccessStatusCode)
             {
@@ -220,19 +126,16 @@
                 return;
             }
 
-            // Deserialize the ROOT type your API returns
-            var apiResponse = JsonSerializer.Deserialize<ImageEvaluationResponse>(
+            // Deserialize API response
+            evalResponse = JsonSerializer.Deserialize<ImageEvaluationResponse>(
                 body,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+            );
 
-            if (apiResponse == null)
+            if (evalResponse == null)
             {
                 error = "Could not parse API response.";
-                return;
             }
-
-            evalResponse = apiResponse;
-
         }
         catch (Exception ex)
         {
@@ -244,5 +147,4 @@
             StateHasChanged();
         }
     }
-
 }
