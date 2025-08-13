@@ -7,13 +7,75 @@
 
 <p role="status">Current count: @currentCount</p>
 
-<button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
+<button class="btn btn-primary" @onclick="IncrementCount">Increment</button>
+
+<div class="mt-3">
+    <button class="btn btn-secondary" @onclick="PingApi" disabled="@isPinging">
+        @(isPinging ? "Pinging..." : "Ping API")
+    </button>
+    @if (!string.IsNullOrEmpty(pingResult))
+    {
+        <p class="mt-2"><strong>Ping result:</strong> @pingResult</p>
+    }
+</div>
+
+<MudSelect T="string"
+           MultiSelection="true"
+           SelectAll="true"
+           SelectAllText="Select all felines"
+           @bind-SelectedValues="options"
+           MultiSelectionTextFunc="@(new Func<List<string>, string>(GetMultiSelectionText))"
+           Label="Felines"
+           AdornmentIcon="@Icons.Material.Filled.Search">
+    @foreach (var feline in felines)
+    {
+        <MudSelectItem T="string" Value="@feline">@feline</MudSelectItem>
+    }
+</MudSelect>
 
 @code {
     private int currentCount = 0;
+    private bool isPinging = false;
+    private string? pingResult;
 
-    private void IncrementCount()
+    [Inject] private HttpClient Http { get; set; } = default!; // requires AddHttpClient()
+
+    private string value { get; set; } = "Nothing selected";
+
+    private IEnumerable<string> options { get; set; } = new HashSet<string> { "Lion" };
+
+    private string[] felines =
     {
-        currentCount++;
+        "Jaguar", "Leopard", "Lion", "Lynx", "Panther", "Puma", "Tiger"
+    };
+
+    private string GetMultiSelectionText(List<string> selectedValues)
+    {
+        return $"{selectedValues.Count} feline{(selectedValues.Count > 1 ? "s have" : " has")} been selected";
+    }
+
+    private void IncrementCount() => currentCount++;
+
+    private async Task PingApi()
+    {
+        isPinging = true;
+        pingResult = null;
+
+        try
+        {
+            // var text = await Http.GetStringAsync("http://localhost:8000/");
+            var text = await Http.GetStringAsync("http://127.0.0.1:8000/");
+            pingResult = $"OK: {text}";
+            Console.WriteLine($"Ping OK: {text}");
+        }
+        catch (Exception ex)
+        {
+            pingResult = $"FAIL: {ex}";
+            Console.WriteLine($"Ping FAIL: {ex}");
+        }
+        finally
+        {
+            isPinging = false;
+        }
     }
 }
