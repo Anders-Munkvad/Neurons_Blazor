@@ -1,64 +1,225 @@
 ﻿@page "/weather"
-@attribute [StreamRendering]
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@using System.Linq
+@using Neurons_Types
+@using System.Net.Http.Headers
+@using System.Net.Http.Json
+@using MudBlazor
 
-<PageTitle>Weather</PageTitle>
+<MudContainer MaxWidth="MaxWidth.False" Class="pa-6">
+    <MudGrid Spacing="3">
+        <!-- LEFT: Controls (sticky) -->
+        <MudItem xs="12" md="4" lg="3">
+            <MudStack Spacing="3" Class="sticky-col">
+                <!-- Section: Image -->
+                <MudCard>
+                    <MudCardHeader>
+                        <MudText Typo="Typo.h6">Upload Picture</MudText>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudFileUpload T="IBrowserFile"
+                                       FilesChanged="OnImageFileChanged"
+                                       Accept="image/*"
+                                       MaxFiles="1">
+                            <ActivatorContent>
+                                <MudFab Color="Color.Secondary"
+                                        StartIcon="@Icons.Material.Filled.Image"
+                                        Label="Load picture" />
+                            </ActivatorContent>
+                        </MudFileUpload>
 
-<h1>Weather</h1>
+                        @if (imagePreview != null)
+                        {
+                            <MudDivider Class="my-2" />
+                            <img src="@imagePreview" style="max-width:100%; border-radius:8px;" />
+                        }
+                    </MudCardContent>
+                </MudCard>
 
-<p>This component demonstrates showing data.</p>
+                <!-- Section: PDF -->
+                <MudCard>
+                    <MudCardHeader>
+                        <MudText Typo="Typo.h6">Upload Brand Kit (PDF)</MudText>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudFileUpload T="IBrowserFile"
+                                       FilesChanged="OnBrandKitFileChanged"
+                                       Accept="application/pdf"
+                                       MaxFiles="1">
+                            <ActivatorContent>
+                                <MudButton Variant="Variant.Filled"
+                                           Color="Color.Primary"
+                                           StartIcon="@Icons.Material.Filled.CloudUpload">
+                                    Upload PDF
+                                </MudButton>
+                            </ActivatorContent>
+                        </MudFileUpload>
+                    </MudCardContent>
+                </MudCard>
 
-@if (forecasts == null)
-{
-    <p><em>Loading...</em></p>
-}
-else
-{
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Temp. (C)</th>
-                <th>Temp. (F)</th>
-                <th>Summary</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var forecast in forecasts)
-            {
-                <tr>
-                    <td>@forecast.Date.ToShortDateString()</td>
-                    <td>@forecast.TemperatureC</td>
-                    <td>@forecast.TemperatureF</td>
-                    <td>@forecast.Summary</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
+                <!-- Section: Model -->
+                <MudCard>
+                    <MudCardHeader>
+                        <MudText Typo="Typo.h6">Choose Model</MudText>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudSelect Label="Model"
+                                   @bind-Value="selectedModel">
+                            @foreach (var m in models)
+                            {
+                                <MudSelectItem Value="@m">@m</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudCardContent>
+                </MudCard>
+
+                <!-- Action -->
+                <MudButton Color="Color.Primary"
+                           Variant="Variant.Filled"
+                           Disabled="@(!CanEvaluate || isLoading)"
+                           OnClick="CallImageEvaluation"
+                           StartIcon="@Icons.Material.Filled.PlayArrow">
+                    @(isLoading ? "Evaluating..." : "Evaluate Brand Compliance")
+                </MudButton>
+
+                @if (!string.IsNullOrEmpty(error))
+                {
+                    <MudAlert Severity="Severity.Error">@error</MudAlert>
+                }
+            </MudStack>
+        </MudItem>
+
+        <!-- MIDDLE: Result / Demo area -->
+        <MudItem xs="12" md="8" lg="9">
+            <MudPaper Elevation="1" Class="pa-6 d-flex align-center justify-center" Style="min-height: 260px;">
+                @if (isLoading)
+                {
+                    <MudStack AlignItems="AlignItems.Center" Spacing="2">
+                        <MudProgressCircular Indeterminate="true" />
+                        <MudText Typo="Typo.subtitle1">Evaluating…</MudText>
+                    </MudStack>
+                }
+                else if (evalResponse is null)
+                {
+                    <MudText Color="Color.Secondary">
+                        Upload an image + PDF on the left, choose a model, then click <b>Evaluate</b>.
+                    </MudText>
+                }
+                else
+                {
+                    <MudStack Spacing="3" Class="w-100">
+                        <MudText Typo="Typo.h6">Prompt Used</MudText>
+                        <MudCodeHighlight Code="@evalResponse.PromptUsed" />
+
+                        <MudDivider />
+
+                        <MudText Typo="Typo.h6">Model Output</MudText>
+                        <MudCodeHighlight Code="@evalResponse.ModelOutput" />
+                    </MudStack>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
 
 @code {
-    private WeatherForecast[]? forecasts;
+    private IBrowserFile? uploadedImage;
+    private IBrowserFile? uploadedBrandKit;
+    private string? imagePreview;
+    private bool isLoading;
+    private string? error;
+    private ImageEvaluationResponse? evalResponse;
 
-    protected override async Task OnInitializedAsync()
+    [Inject] private HttpClient Http { get; set; } = default!;
+    private bool CanEvaluate => uploadedImage is not null && uploadedBrandKit is not null;
+
+    // Model select
+    private string selectedModel { get; set; } = "ChatGPT-4o";
+    private string[] models = { "ChatGPT-4o", "Jaguar", "Leopard", "Lynx", "Panther", "Puma", "Tiger" };
+    private IEnumerable<string> options { get; set; } = new HashSet<string> { "ChatGPT-4o" }; // kept if you still need it
+    private string GetMultiSelectionText(List<string> selectedValues)
+        => $"{string.Join(", ", selectedValues)} has been selected!";
+
+    private async Task OnImageFileChanged(IBrowserFile file)
     {
-        // Simulate asynchronous loading to demonstrate streaming rendering
-        await Task.Delay(500);
-
-        var startDate = DateOnly.FromDateTime(DateTime.Now);
-        var summaries = new[] { "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching" };
-        forecasts = Enumerable.Range(1, 5).Select(index => new WeatherForecast
-        {
-            Date = startDate.AddDays(index),
-            TemperatureC = Random.Shared.Next(-20, 55),
-            Summary = summaries[Random.Shared.Next(summaries.Length)]
-        }).ToArray();
+        uploadedImage = file;
+        var resized = await file.RequestImageFileAsync("image/png", 600, 500);
+        using var stream = resized.OpenReadStream(10 * 1024 * 1024);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        imagePreview = $"data:image/png;base64,{Convert.ToBase64String(ms.ToArray())}";
     }
 
-    private class WeatherForecast
+    private Task OnBrandKitFileChanged(IBrowserFile file)
     {
-        public DateOnly Date { get; set; }
-        public int TemperatureC { get; set; }
-        public string? Summary { get; set; }
-        public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+        uploadedBrandKit = file;
+        return Task.CompletedTask;
+    }
+
+    private async Task CallImageEvaluation()
+    {
+        if (!CanEvaluate) return;
+
+        error = null;
+        evalResponse = null;
+        isLoading = true;
+
+        try
+        {
+            // Prepare image bytes
+            var resizedImage = await uploadedImage!.RequestImageFileAsync("image/png", 600, 500);
+            byte[] imageBytes;
+            using (var s = resizedImage.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024))
+            using (var ms = new MemoryStream())
+            {
+                await s.CopyToAsync(ms);
+                imageBytes = ms.ToArray();
+            }
+
+            // Prepare PDF stream
+            using var pdfStream = uploadedBrandKit!.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+
+            // Build multipart content
+            using var form = new MultipartFormDataContent();
+
+            var pdfContent = new StreamContent(pdfStream);
+            pdfContent.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+            form.Add(pdfContent, "brand_kit", uploadedBrandKit.Name);
+
+            var imgContent = new ByteArrayContent(imageBytes);
+            imgContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+            form.Add(imgContent, "image_file", uploadedImage.Name);
+
+            // Add model choice if your API accepts it
+            form.Add(new StringContent(selectedModel), "model");
+
+            // Call FastAPI endpoint
+            var response = await Http.PostAsync("http://127.0.0.1:8000/evaluate_brand_compliance_wAPI", form);
+            var body = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                error = $"Upload failed: {(int)response.StatusCode} {response.ReasonPhrase}\n{body}";
+                return;
+            }
+
+            evalResponse = JsonSerializer.Deserialize<ImageEvaluationResponse>(
+                body,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            if (evalResponse == null)
+                error = "Could not parse API response.";
+        }
+        catch (Exception ex)
+        {
+            error = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
     }
 }
