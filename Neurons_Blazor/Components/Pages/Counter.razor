@@ -1,92 +1,40 @@
-﻿@page "/counter"
-@inject ISnackbar Snackbar
+﻿@page "/ping"
 
-<PageTitle>Counter</PageTitle>
+<PageTitle>Ping API</PageTitle>
 
-<h1>Counter</h1>
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+    <MudPaper Elevation="2" Class="pa-6 text-center">
+        <MudText Typo="Typo.h4" Color="Color.Primary" GutterBottom="true">
+            API Connectivity Check
+        </MudText>
 
-<p role="status">Current count: @currentCount</p>
+        <MudText Typo="Typo.subtitle2" Class="mud-text-secondary mb-4">
+            Use the button below to test if the backend is reachable.
+        </MudText>
 
-<button class="btn btn-primary" @onclick="IncrementCount">Increment</button>
-
-<div class="mt-3">
-    <button class="btn btn-secondary" @onclick="PingApi" disabled="@isPinging">
-        @(isPinging ? "Pinging..." : "Ping API")
-    </button>
-    @if (!string.IsNullOrEmpty(pingResult))
-    {
-        <p class="mt-2"><strong>Ping result:</strong> @pingResult</p>
-    }
-</div>
-
-<MudFileUpload T="IBrowserFile" 
-               FilesChanged="UploadFiles" 
-               Accept="image/*"
-               MaxFiles="1">
-    <ActivatorContent>
-        <MudFab Color="Color.Secondary"
-                StartIcon="@Icons.Material.Filled.Image"
-                Label="Load picture" />
-    </ActivatorContent>
-</MudFileUpload>
-
-<MudFileUpload T="IBrowserFile" 
-               FilesChanged="UploadFiles" 
-               Accept="application/pdf"
-               MaxFiles="1">
-    <ActivatorContent>
         <MudButton Variant="Variant.Filled"
                    Color="Color.Primary"
-                   StartIcon="@Icons.Material.Filled.CloudUpload">
-            Upload PDF
+                   OnClick="PingApi"
+                   Disabled="@isPinging"
+                   StartIcon="@Icons.Material.Filled.Wifi">
+            @(isPinging ? "Pinging..." : "Ping API")
         </MudButton>
-    </ActivatorContent>
-</MudFileUpload>
 
-
-<MudSelect T="string"
-           MultiSelection="true"
-           SelectAll="true"
-           SelectAllText="Select all felines"
-           @bind-SelectedValues="options"
-           MultiSelectionTextFunc="@(new Func<List<string>, string>(GetMultiSelectionText))"
-           Label="Felines"
-           AdornmentIcon="@Icons.Material.Filled.Search">
-    @foreach (var feline in felines)
-    {
-        <MudSelectItem T="string" Value="@feline">@feline</MudSelectItem>
-    }
-</MudSelect>
+        @if (!string.IsNullOrEmpty(pingResult))
+        {
+            <MudDivider Class="my-4" />
+            <MudText Typo="Typo.subtitle1">
+                <b>Ping result:</b> @pingResult
+            </MudText>
+        }
+    </MudPaper>
+</MudContainer>
 
 @code {
-    private int currentCount = 0;
     private bool isPinging = false;
     private string? pingResult;
 
-    [Inject] private HttpClient Http { get; set; } = default!; // requires AddHttpClient()
-
-    private string value { get; set; } = "Nothing selected";
-
-    private IEnumerable<string> options { get; set; } = new HashSet<string> { "Lion" };
-
-    private string[] felines =
-    {
-        "Jaguar", "Leopard", "Lion", "Lynx", "Panther", "Puma", "Tiger"
-    };
-
-    private string GetMultiSelectionText(List<string> selectedValues)
-    {
-        return $"{selectedValues.Count} feline{(selectedValues.Count > 1 ? "s have" : " has")} been selected";
-    }
-
-    IList<IBrowserFile> _files = new List<IBrowserFile>();
-    private void UploadFiles(IBrowserFile file)
-    {
-        _files.Add(file);
-        //TODO upload the files to the server
-    }
-
-    private void IncrementCount() => currentCount++;
+    [Inject] private HttpClient Http { get; set; } = default!;
 
     private async Task PingApi()
     {
@@ -95,14 +43,13 @@
 
         try
         {
-            // var text = await Http.GetStringAsync("http://localhost:8000/");
             var text = await Http.GetStringAsync("http://127.0.0.1:8000/");
-            pingResult = $"OK: {text}";
+            pingResult = $"✅ OK: {text}";
             Console.WriteLine($"Ping OK: {text}");
         }
         catch (Exception ex)
         {
-            pingResult = $"FAIL: {ex}";
+            pingResult = $"❌ FAIL: {ex.Message}";
             Console.WriteLine($"Ping FAIL: {ex}");
         }
         finally
