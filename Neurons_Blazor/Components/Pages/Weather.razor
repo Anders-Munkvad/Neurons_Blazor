@@ -110,14 +110,13 @@
                 else
                 {
                     <MudStack Spacing="3" Class="w-100">
-                        <MudText Typo="Typo.h6">Prompt Used</MudText>
-                        <MudCodeHighlight Code="@evalResponse.PromptUsed" />
-
-                        <MudDivider />
-
-                        <MudText Typo="Typo.h6">Model Output</MudText>
-                        <MudCodeHighlight Code="@evalResponse.ModelOutput" />
-                    </MudStack>
+                    <MudText Typo="Typo.h6">Model Output</MudText>
+                    <MudPaper Class="pa-3 overflow-auto" Style="max-height:420px;">
+                        <pre style="white-space:pre-wrap;word-break:break-word;margin:0;">
+                @evalResponse?.ModelOutput
+                        </pre>
+                    </MudPaper>
+                </MudStack>
                 }
             </MudPaper>
         </MudItem>
@@ -137,7 +136,7 @@
 
     // Model select
     private string selectedModel { get; set; } = "ChatGPT-4o";
-    private string[] models = { "ChatGPT-4o", "Jaguar", "Leopard", "Lynx", "Panther", "Puma", "Tiger" };
+    private string[] models = { "ChatGPT-4o", "Model 2", "Nodel 3" };
     private IEnumerable<string> options { get; set; } = new HashSet<string> { "ChatGPT-4o" }; // kept if you still need it
     private string GetMultiSelectionText(List<string> selectedValues)
         => $"{string.Join(", ", selectedValues)} has been selected!";
@@ -193,7 +192,7 @@
             form.Add(imgContent, "image_file", uploadedImage.Name);
 
             // Add model choice if your API accepts it
-            form.Add(new StringContent(selectedModel), "model");
+            form.Add(new StringContent(selectedModel), "model_name");
 
             // Call FastAPI endpoint
             var response = await Http.PostAsync("http://127.0.0.1:8000/evaluate_brand_compliance_wAPI", form);

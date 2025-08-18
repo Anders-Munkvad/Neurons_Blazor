@@ -123,7 +123,7 @@
     // Dropdown
     private string value { get; set; } = "Nothing selected";
     private IEnumerable<string> options { get; set; } = new HashSet<string> { "ChatGPT-4o" };
-    private string[] models = { "Jaguar", "Leopard", "ChatGPT-4o", "Lynx", "Panther", "Puma", "Tiger" };
+    private string[] models = { "ChatGPT-4o", "Model 2", "Nodel 3" };
 
     private string GetMultiSelectionText(List<string> selectedValues)
         => $"{string.Join(", ", selectedValues)} has been selected!";
