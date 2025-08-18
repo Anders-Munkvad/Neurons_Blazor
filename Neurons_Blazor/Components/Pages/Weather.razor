@@ -13,6 +13,14 @@
         <!-- LEFT: Controls (sticky) -->
         <MudItem xs="12" md="4" lg="3">
             <MudStack Spacing="3" Class="sticky-col">
+
+                @if (BothOk)
+                {
+                    <MudAlert Severity="Severity.Success" Variant="Variant.Filled" Dense="true" Elevation="0">
+                        ✅ Files ready — you can now evaluate brand compliance.
+                    </MudAlert>
+                }
+
                 <!-- Section: Image -->
                 <MudCard>
                     <MudCardHeader>
@@ -29,6 +37,13 @@
                                         Label="Load picture" />
                             </ActivatorContent>
                         </MudFileUpload>
+
+                        @if (imageOk)
+                        {
+                            <MudAlert Severity="Severity.Success" Dense="true" Class="mt-2">
+                                Image uploaded: <b>@uploadedImage?.Name</b>
+                            </MudAlert>
+                        }
 
                         @if (imagePreview != null)
                         {
@@ -56,6 +71,13 @@
                                 </MudButton>
                             </ActivatorContent>
                         </MudFileUpload>
+
+                        @if (pdfOk)
+                        {
+                            <MudAlert Severity="Severity.Success" Dense="true" Class="mt-2">
+                                PDF uploaded: <b>@uploadedBrandKit?.Name</b>
+                            </MudAlert>
+                        }
                     </MudCardContent>
                 </MudCard>
 
@@ -103,20 +125,20 @@
                 }
                 else if (evalResponse is null)
                 {
-                    <MudText Color="Color.Secondary">
+                    <MudText Class="mud-text-secondary">
                         Upload an image + PDF on the left, choose a model, then click <b>Evaluate</b>.
                     </MudText>
                 }
                 else
                 {
                     <MudStack Spacing="3" Class="w-100">
-                    <MudText Typo="Typo.h6">Model Output</MudText>
-                    <MudPaper Class="pa-3 overflow-auto" Style="max-height:420px;">
-                        <pre style="white-space:pre-wrap;word-break:break-word;margin:0;">
-                @evalResponse?.ModelOutput
-                        </pre>
-                    </MudPaper>
-                </MudStack>
+                        <MudText Typo="Typo.h6">Model Output</MudText>
+                        <MudPaper Class="pa-3 overflow-auto" Style="max-height:420px;">
+                            <pre style="white-space:pre-wrap;word-break:break-word;margin:0;">
+@evalResponse?.ModelOutput
+                            </pre>
+                        </MudPaper>
+                    </MudStack>
                 }
             </MudPaper>
         </MudItem>
@@ -131,29 +153,35 @@
     private string? error;
     private ImageEvaluationResponse? evalResponse;
 
+    private bool imageOk;
+    private bool pdfOk;
+    private bool BothOk => imageOk && pdfOk;
+
     [Inject] private HttpClient Http { get; set; } = default!;
     private bool CanEvaluate => uploadedImage is not null && uploadedBrandKit is not null;
 
     // Model select
     private string selectedModel { get; set; } = "ChatGPT-4o";
     private string[] models = { "ChatGPT-4o", "Model 2", "Nodel 3" };
-    private IEnumerable<string> options { get; set; } = new HashSet<string> { "ChatGPT-4o" }; // kept if you still need it
-    private string GetMultiSelectionText(List<string> selectedValues)
-        => $"{string.Join(", ", selectedValues)} has been selected!";
 
     private async Task OnImageFileChanged(IBrowserFile file)
     {
         uploadedImage = file;
+        imageOk = uploadedImage != null;
+
         var resized = await file.RequestImageFileAsync("image/png", 600, 500);
         using var stream = resized.OpenReadStream(10 * 1024 * 1024);
         using var ms = new MemoryStream();
         await stream.CopyToAsync(ms);
         imagePreview = $"data:image/png;base64,{Convert.ToBase64String(ms.ToArray())}";
+        StateHasChanged();
     }
 
     private Task OnBrandKitFileChanged(IBrowserFile file)
     {
         uploadedBrandKit = file;
+        pdfOk = uploadedBrandKit != null;
+        StateHasChanged();
         return Task.CompletedTask;
     }
 
@@ -191,7 +219,7 @@
             imgContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
             form.Add(imgContent, "image_file", uploadedImage.Name);
 
-            // Add model choice if your API accepts it
+            // Add model choice
             form.Add(new StringContent(selectedModel), "model_name");
 
             // Call FastAPI endpoint
